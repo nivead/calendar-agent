@@ -1,0 +1,64 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+import warnings
+warnings.filterwarnings("ignore")
+
+from langchain_core.messages import HumanMessage
+from agent.graph import graph
+
+import phoenix as px
+from openinference.instrumentation.langchain import LangChainInstrumentor
+
+# Starts a local web UI at http://localhost:6006
+px.launch_app()
+LangChainInstrumentor().instrument()
+
+USER_TIMEZONE = "America/Los_Angeles"  # match your tools/calendar_tools.py setting
+
+def chat(thread_id: str = "default"):
+    print("Calendar Agent ready. Type 'quit' to exit.\n")
+    config = {"configurable": {"thread_id": thread_id}}
+
+    while True:
+        user_input = input("You: ").strip()
+        if not user_input or user_input.lower() in ("quit", "exit"):
+            break
+
+        now = datetime.now(ZoneInfo(USER_TIMEZONE))
+        time_context = f"[Current time: {now.strftime('%A, %B %d %Y %I:%M %p %Z')}]"
+        full_message = f"{time_context}\n\n{user_input}"
+
+        print()  # breathing room
+        final_reply = None
+
+        for event in graph.stream(
+            {"messages": [HumanMessage(content=full_message)]},
+            config=config,
+            stream_mode="updates",  # emit a dict per node execution
+        ):
+            for node_name, node_output in event.items():
+                messages = node_output.get("messages", [])
+                for msg in messages:
+                    msg_type = type(msg).__name__
+
+                    if msg_type == "AIMessage":
+                        if msg.tool_calls:
+                            for tc in msg.tool_calls:
+                                print(f"  [llm]   → {tc['name']}({tc['args']})")
+                        else:
+                            final_reply = msg.content
+
+                    elif msg_type == "ToolMessage":
+                        # Trim long results so they don't flood the terminal
+                        content = msg.content
+                        if len(content) > 200:
+                            content = content[:200] + "..."
+                        print(f"  [tool]  ← {msg.name}: {content}")
+
+        if final_reply:
+            print(f"\nAgent: {final_reply}\n")
+
+
+
+if __name__ == "__main__":
+    chat()
