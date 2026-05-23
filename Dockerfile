@@ -15,7 +15,6 @@ COPY auth.py   .
 # Copy pre-built React app
 COPY frontend/dist/ ./frontend/dist/
 
-# expose port
 EXPOSE 8000 
 
 CMD ["uvicorn", "backend.main:app", \
