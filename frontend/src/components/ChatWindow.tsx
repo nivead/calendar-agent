@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect } from 'react'
 import { useChat } from '../hooks/useChat'
+import { useUser } from '../hooks/useUser'
 import { MessageBubble } from './Message'
 
 export function ChatWindow() {
   const [input, setInput] = useState('')
-  const { messages, isLoading, activeTools, sendMessage } = useChat()
+  const threadId = useRef(crypto.randomUUID()).current
+  const { messages, isLoading, activeTools, sendMessage } = useChat(threadId)
+  const user = useUser()
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // Auto-scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, activeTools])
@@ -18,6 +20,18 @@ export function ChatWindow() {
     setInput('')
   }
 
+  // Extract conditional JSX into variables — avoids Vite 8 OXC parser bug
+  // with multi-line JSX inside && expressions
+  const userEmail = user
+    ? <p className="text-xs text-gray-500">{user.email}</p>
+    : null
+
+  const signOutLink = user
+    ? <a href="/logout" className="text-xs text-gray-400 hover:text-gray-600">Sign out</a>
+    : <p className="text-xs text-gray-400">Powered by Claude</p>
+
+  const welcomeName = user?.name ? `, ${user.name}` : ''
+
   return (
     <div className="flex flex-col h-screen max-w-2xl mx-auto">
 
@@ -26,20 +40,22 @@ export function ChatWindow() {
         <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
           <span className="text-white text-sm">📅</span>
         </div>
-        <div>
+        <div className="flex-1">
           <p className="font-medium text-sm">Calendar assistant</p>
-          <p className="text-xs text-gray-500">Powered by Claude</p>
+          {userEmail}
         </div>
+        {signOutLink}
       </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 && (
           <div className="text-center text-gray-400 mt-16">
-            <p className="text-lg mb-2">👋 Hi! I'm your calendar assistant.</p>
+            <p className="text-lg mb-2">👋 Hi{welcomeName}! I'm your calendar assistant.</p>
             <p className="text-sm">Try: "What's on my calendar this week?" or "Book a meeting tomorrow at 2pm"</p>
           </div>
         )}
+
         {messages.map(msg => (
           <MessageBubble key={msg.id} message={msg} />
         ))}
@@ -60,9 +76,9 @@ export function ChatWindow() {
                 </div>
               ) : (
                 <div className="flex gap-1">
-                  <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{animationDelay:'0ms'}}></span>
-                  <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{animationDelay:'150ms'}}></span>
-                  <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{animationDelay:'300ms'}}></span>
+                  <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                  <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                  <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }}></span>
                 </div>
               )}
             </div>
@@ -90,6 +106,7 @@ export function ChatWindow() {
           ↑
         </button>
       </div>
+
     </div>
   )
 }
