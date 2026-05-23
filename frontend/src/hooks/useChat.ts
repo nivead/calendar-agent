@@ -1,31 +1,39 @@
 import { useState, useCallback, useRef } from 'react'
 import type { Message, ToolCall } from '../types'
 
+// Empty string = same origin (dev proxy or production single container)
+// Set VITE_API_URL in .env.production if deploying frontend separately
+const API_BASE = import.meta.env.VITE_API_URL ?? ''
+
 export function useChat(threadId: string = 'default') {
-  const [messages, setMessages]     = useState<Message[]>([])
-  const [isLoading, setIsLoading]   = useState(false)
+  const [messages, setMessages]       = useState<Message[]>([])
+  const [isLoading, setIsLoading]     = useState(false)
   const [activeTools, setActiveTools] = useState<ToolCall[]>([])
-  const pendingToolsRef = useRef<ToolCall[]>([])
+  const pendingToolsRef               = useRef<ToolCall[]>([])
 
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || isLoading) return
 
-    // Add user message immediately
     const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content }
     setMessages(prev => [...prev, userMsg])
     setIsLoading(true)
     pendingToolsRef.current = []
 
     try {
-      const res = await fetch('/chat', {
+      const res = await fetch(`${API_BASE}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: content, thread_id: threadId }),
       })
 
-      const reader = res.body!.getReader()
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Request failed' }))
+        throw new Error(err.detail ?? `HTTP ${res.status}`)
+      }
+
+      const reader  = res.body!.getReader()
       const decoder = new TextDecoder()
-      let buffer = ''
+      let buffer    = ''
 
       while (true) {
         const { done, value } = await reader.read()
@@ -59,9 +67,9 @@ export function useChat(threadId: string = 'default') {
 
             if (eventType === 'message') {
               const assistantMsg: Message = {
-                id: crypto.randomUUID(),
-                role: 'assistant',
-                content: data.content,
+                id:        crypto.randomUUID(),
+                role:      'assistant',
+                content:   data.content,
                 toolCalls: pendingToolsRef.current,
               }
               setMessages(prev => [...prev, assistantMsg])
@@ -71,15 +79,22 @@ export function useChat(threadId: string = 'default') {
 
             if (eventType === 'error') {
               const errMsg: Message = {
-                id: crypto.randomUUID(),
-                role: 'assistant',
-                content: `Error: ${data.message}`,
+                id:      crypto.randomUUID(),
+                role:    'assistant',
+                content: `⚠️ ${data.message}`,
               }
               setMessages(prev => [...prev, errMsg])
             }
           }
         }
       }
+    } catch (err) {
+      const errMsg: Message = {
+        id:      crypto.randomUUID(),
+        role:    'assistant',
+        content: `⚠️ ${err instanceof Error ? err.message : 'Something went wrong'}`,
+      }
+      setMessages(prev => [...prev, errMsg])
     } finally {
       setIsLoading(false)
       setActiveTools([])
