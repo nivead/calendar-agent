@@ -16,7 +16,7 @@ export function useUser() {
       .then(data => setUser({
         email:      data.email      ?? '',
         name:       data.name       ?? '',
-        is_owner:   data.is_owner   ?? true,  // default true = owner view
+        is_owner:   data.is_owner   ?? true,
         owner_name: data.owner_name ?? '',
       }))
       .catch(() => setUser(null))
