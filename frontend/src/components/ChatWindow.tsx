@@ -16,16 +16,6 @@ export function ChatWindow() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, activeTools])
 
-  useEffect(() => {
-  fetch('/me')
-    .then(r => r.json())
-    .then(data => {
-      setIsOwner(data.is_owner)
-      setOwnerName(data.owner_name ?? '')
-    })
-    .catch(() => setIsOwner(false))
-  }, [])
-
   const handleSend = () => {
     if (!input.trim()) return
     sendMessage(input)
