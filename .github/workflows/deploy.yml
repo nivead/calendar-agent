@@ -117,14 +117,46 @@ jobs:
           container-name: ${{ env.CONTAINER_NAME }}
           image: ${{ steps.build-image.outputs.image }}
 
+      # Deploy to ECS
       - name: Deploy to ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
-          wait-for-minutes: 10
+          task-definition:            ${{ steps.task-def.outputs.task-definition }}
+          service:                    ${{ env.ECS_SERVICE }}
+          cluster:                    ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: false
+
+      # Wait for primary deployment to have desired running count
+      - name: Verify deployment healthy
+        run: |
+          echo "Waiting for ECS deployment to stabilise..."
+          for i in {1..24}; do
+            sleep 10
+            RESULT=$(aws ecs describe-services \
+              --cluster $ECS_CLUSTER \
+              --services $ECS_SERVICE \
+              --region $AWS_REGION \
+              --query "services[0].deployments[?status=='PRIMARY'] | [0]" \
+              --output json)
+
+            RUNNING=$(echo $RESULT | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('runningCount',0))")
+            DESIRED=$(echo $RESULT | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('desiredCount',0))")
+            FAILED=$(echo $RESULT  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('failedTasks',0))")
+
+            echo "Attempt $i/24 — running: $RUNNING / desired: $DESIRED / failed: $FAILED"
+
+            if [ "$FAILED" -gt "0" ]; then
+              echo "Tasks are failing — check CloudWatch logs"
+              exit 1
+            fi
+
+            if [ "$RUNNING" = "$DESIRED" ] && [ "$RUNNING" != "0" ]; then
+              echo "Deployment stable ✅"
+              exit 0
+            fi
+          done
+          echo "Timed out after 4 minutes"
+          exit 1
 
       # ── Post-deploy summary ──────────────────────────────────────────
       - name: Deployment summary
