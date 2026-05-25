@@ -8,11 +8,23 @@ export function ChatWindow() {
   const threadId = useRef(crypto.randomUUID()).current
   const { messages, isLoading, activeTools, sendMessage } = useChat(threadId)
   const user = useUser()
+  const [isOwner, setIsOwner] = useState<boolean | null>(null)
+  const [ownerName, setOwnerName] = useState<string>('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, activeTools])
+
+  useEffect(() => {
+  fetch('/me')
+    .then(r => r.json())
+    .then(data => {
+      setIsOwner(data.is_owner)
+      setOwnerName(data.owner_name ?? '')
+    })
+    .catch(() => setIsOwner(false))
+  }, [])
 
   const handleSend = () => {
     if (!input.trim()) return
@@ -50,9 +62,19 @@ export function ChatWindow() {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 && (
-          <div className="text-center text-gray-400 mt-16">
-            <p className="text-lg mb-2">👋 Hi{welcomeName}! I'm your calendar assistant.</p>
-            <p className="text-sm">Try: "What's on my calendar this week?" or "Book a meeting tomorrow at 2pm"</p>
+          <div className="text-center text-gray-400 mt-16 px-4">
+            {isOwner ? (
+              <>
+                <p className="text-lg mb-2">👋 Hi{welcomeName}! What's on your agenda?</p>
+                <p className="text-sm">Try: "What's on my calendar today?" or "Book a meeting tomorrow at 2pm"</p>
+              </>
+            ) : (
+              <>
+                <p className="text-lg mb-2">👋 Hi! I'm {ownerName}'s assistant.</p>
+                <p className="text-sm">I can check their availability and book a meeting on your behalf.</p>
+                <p className="text-sm mt-1">Try: "Is {ownerName} free tomorrow at 2pm?"</p>
+              </>
+            )}
           </div>
         )}
 
