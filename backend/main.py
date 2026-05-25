@@ -98,50 +98,35 @@ def check_rate_limit(
 
 
 # ── Orphaned tool call repair ──────────────────────────────────────────────
-def fix_orphaned_tool_calls(thread_config: dict) -> int:
-    """
-    Add synthetic ToolMessages for any AIMessages with tool_calls that
-    have no corresponding ToolMessage after them. Prevents Claude's
-    400 invalid_request_error on corrupted conversation threads.
-    """
+def fix_orphaned_tool_calls(thread_config: dict, selected_graph=None) -> int:
+    from agent.graph import owner_graph
+    g = selected_graph or owner_graph
     try:
-        state = graph.get_state(thread_config)
+        state = g.get_state(thread_config)
         if not state or not state.values:
             return 0
-
         messages = state.values.get("messages", [])
         if not messages:
             return 0
-
         fixed = 0
         synthetic_results = []
-
         for i, msg in enumerate(messages):
             if not isinstance(msg, AIMessage) or not msg.tool_calls:
                 continue
             next_msg = messages[i + 1] if i + 1 < len(messages) else None
             if isinstance(next_msg, ToolMessage):
                 continue
-
             for tc in msg.tool_calls:
-                synthetic_results.append(
-                    ToolMessage(
-                        content=(
-                            "This tool call was interrupted before completing. "
-                            "Please ignore the previous attempt and try again."
-                        ),
-                        tool_call_id=tc["id"],
-                        name=tc["name"],
-                    )
-                )
+                synthetic_results.append(ToolMessage(
+                    content="This tool call was interrupted. Please try again.",
+                    tool_call_id=tc["id"],
+                    name=tc["name"],
+                ))
                 fixed += 1
-
         if synthetic_results:
-            graph.update_state(thread_config, {"messages": synthetic_results})
+            g.update_state(thread_config, {"messages": synthetic_results})
             print(f"  [repair] Fixed {fixed} orphaned tool call(s)")
-
         return fixed
-
     except Exception as e:
         print(f"  [repair] Warning: {e}")
         return 0
@@ -166,11 +151,14 @@ async def stream_agent(
 
     config = {"configurable": {"thread_id": thread_id}}
 
-    # Repair orphaned tool calls before invoking
-    fix_orphaned_tool_calls(config)
+    # Select graph based on user identity
+    from agent.graph import get_graph
+    selected_graph = get_graph(user["email"])
+
+    fix_orphaned_tool_calls(config)   # uses owner_graph — update below
 
     try:
-        for event in graph.stream(
+        for event in selected_graph.stream(
             {"messages": [HumanMessage(content=full_message)]},
             config=config,
             stream_mode="updates",
@@ -214,14 +202,10 @@ async def stream_agent(
         print(f"  [error] {error_msg}")
         if "tool_use" in error_msg and "tool_result" in error_msg:
             yield make_sse("error", {
-                "message": (
-                    "The conversation got into a bad state. "
-                    "Please refresh the page to start a new session."
-                )
+                "message": "The conversation got into a bad state. Please refresh the page."
             })
         else:
             yield make_sse("error", {"message": error_msg})
-
 
 # ── Request model ──────────────────────────────────────────────────────────
 class ChatRequest(BaseModel):
@@ -233,7 +217,7 @@ class ChatRequest(BaseModel):
 @app.post("/chat")
 async def chat(req: ChatRequest, request: Request):
     if not check_rate_limit(req.thread_id):
-        raise HTTPException(status_code=429, detail="Too many requests. Please wait.")
+        raise HTTPException(status_code=429, detail="Too many requests.")
 
     user = get_current_user(request)
     scoped_thread_id = f"{user['user_id']}:{req.thread_id}"
