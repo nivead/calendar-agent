@@ -1,4 +1,3 @@
-import { useState, useRef, useEffect } from 'react'
 import { useChat } from '../hooks/useChat'
 import { useUser } from '../hooks/useUser'
 import { MessageBubble } from './Message'
@@ -8,8 +7,6 @@ export function ChatWindow() {
   const threadId = useRef(crypto.randomUUID()).current
   const { messages, isLoading, activeTools, sendMessage } = useChat(threadId)
   const user = useUser()
-  const [isOwner, setIsOwner] = useState<boolean | null>(null)
-  const [ownerName, setOwnerName] = useState<string>('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
