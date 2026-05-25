@@ -10,8 +10,8 @@ export function ChatWindow() {
   const user              = useUser()
   const bottomRef         = useRef<HTMLDivElement>(null)
 
-  const isOwner   = user?.is_owner   ?? true
-  const ownerName = user?.owner_name ?? ''
+  const isOwner    = user?.is_owner   ?? true
+  const ownerName  = user?.owner_name ?? ''
   const welcomeName = user?.name ? `, ${user.name}` : ''
 
   useEffect(() => {
@@ -51,18 +51,34 @@ export function ChatWindow() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
+
         {messages.length === 0 && (
           <div className="text-center text-gray-400 mt-16 px-4">
             {isOwner ? (
               <>
-                <p className="text-lg mb-2">👋 Hi{welcomeName}! What's on your agenda?</p>
-                <p className="text-sm">Try: "What's on my calendar today?" or "Book a meeting tomorrow at 2pm"</p>
+                <p className="text-lg mb-2">👋 Hi{welcomeName}!</p>
+                <p className="text-sm font-medium text-gray-500 mb-2">
+                  Your personal calendar assistant
+                </p>
+                <p className="text-sm">
+                  Try: "What's on my calendar today?" or "Book a meeting tomorrow at 2pm"
+                </p>
               </>
             ) : (
               <>
-                <p className="text-lg mb-2">👋 Hi! I'm {ownerName}'s assistant.</p>
-                <p className="text-sm">I can check their availability and book a meeting on your behalf.</p>
-                <p className="text-sm mt-1">Try: "Is {ownerName} free tomorrow at 2pm?"</p>
+                <p className="text-lg mb-2">
+                  👋 Hi! I'm {ownerName ? `${ownerName}'s` : 'a'} personal assistant.
+                </p>
+                <p className="text-sm">
+                  I can help you book time in {ownerName ? `${ownerName}'s` : 'their'} calendar.
+                </p>
+                <p className="text-sm mt-2 text-gray-400">Try asking:</p>
+                <p className="text-sm">
+                  "Is {ownerName || 'they'} free tomorrow at 2pm?"
+                </p>
+                <p className="text-sm">
+                  "I'd like to schedule a 30-minute call with {ownerName || 'them'}"
+                </p>
               </>
             )}
           </div>
@@ -72,7 +88,7 @@ export function ChatWindow() {
           <MessageBubble key={msg.id} message={msg} />
         ))}
 
-        {/* Live tool activity */}
+        {/* Live tool activity while agent is running */}
         {isLoading && (
           <div className="flex justify-start mb-4">
             <div className="bg-gray-100 rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-[80%]">
@@ -88,9 +104,12 @@ export function ChatWindow() {
                 </div>
               ) : (
                 <div className="flex gap-1">
-                  <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                  <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                  <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                  <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"
+                        style={{ animationDelay: '0ms' }}></span>
+                  <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"
+                        style={{ animationDelay: '150ms' }}></span>
+                  <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"
+                        style={{ animationDelay: '300ms' }}></span>
                 </div>
               )}
             </div>
@@ -106,7 +125,10 @@ export function ChatWindow() {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-          placeholder={isOwner ? "Ask about your calendar..." : `Ask about ${ownerName}'s availability...`}
+          placeholder={isOwner
+            ? "Ask about your calendar..."
+            : `Book time with ${ownerName || 'them'}...`
+          }
           disabled={isLoading}
           className="flex-1 border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
         />
