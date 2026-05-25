@@ -20,7 +20,8 @@ LangChainInstrumentor().instrument(tracer_provider=tracer_provider)
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from langchain_core.messages import HumanMessage
-from agent.graph import graph
+from agent.graph import owner_graph as graph
+
 
 USER_TIMEZONE = "America/Los_Angeles"
 

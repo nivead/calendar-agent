@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import MagicMock
 from langchain_core.messages import HumanMessage
-from agent.graph import graph
+from agent.graph import owner_graph as graph
 
 
 def run_agent(user_message: str, thread_id: str = "eval"):

@@ -122,6 +122,8 @@ def build_graph(owner: bool = True):
 owner_graph = build_graph(owner=True)
 guest_graph = build_graph(owner=False)
 
+# Backward-compatible alias — used by evals and chat.py
+graph = owner_graph
 
 def get_graph(email: str):
     """Return the correct graph based on user identity."""
